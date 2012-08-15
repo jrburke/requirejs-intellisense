@@ -47,7 +47,7 @@
     }
 
     window.define = function (name, deps, callback) {
-        defines.push([deps, callback]);
+        defines.push([name, deps, callback]);
     }
     
     window.define.amd = {
