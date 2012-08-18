@@ -48,6 +48,12 @@
 
     window.define = function (name, deps, callback) {
         defines.push([name, deps, callback]);
+
+        oldRequire.call(window, deps, callback);
+
+        defines.forEach(function (define) {
+            oldDefine.apply(window, define);
+        });
     }
     
     window.define.amd = {
@@ -78,6 +84,7 @@
     }
 
     // Redirect all of the patched methods back to their originals
+    // so Intellisense will use the previously defined annotations
     intellisense.redirectDefinition(requirejs.load, oldLoad);
     intellisense.redirectDefinition(window.define, oldDefine);
     intellisense.redirectDefinition(window.require, oldRequire);
