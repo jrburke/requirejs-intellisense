@@ -2,7 +2,8 @@
 
 !function (window) {
     var defines = [],
-        moduleUrls = [],
+        moduleMap = {},
+        loadTimeId = 0,
         oldDefine = window.define,
         oldRequire = window.require,
         oldLoad = requirejs.load;
@@ -42,42 +43,46 @@
     });
 
     requirejs.load = function (context, moduleName, url) {
-        moduleUrls.push(url);
+        intellisense.logMessage('requirejs.load called: ' + moduleName + ': ' + url);
+        moduleMap[url] = moduleName;
         oldLoad.call(requirejs, context, moduleName, url);
     }
 
     window.define = function (name, deps, callback) {
-        defines.push([name, deps, callback]);
+        oldDefine.apply(window, arguments);
+        intellisense.logMessage('In define: ' + name);
+        if (!loadTimeId) {
+            //Wait for current script to finish executing, then
+            //call script load event handler for anything that has
+            //been waiting.
+            loadTimeId = setTimeout(function () {
+                loadTimeId = 0;
+                var scriptElements = document.getElementsByTagName("script");
+                intellisense.logMessage('in loadTimeout');
+                for (var i = 0; i < scriptElements.length; i++) {
+                    var script = scriptElements[i];
+                    var moduleName = moduleMap[script.src];
+                    intellisense.logMessage('SCRIPT: ' + script.src + ': ' + moduleName);
+                    if (moduleName) {
+                        intellisense.logMessage('herelTI');
+                        intellisense.logMessage(moduleName + '->' + script.src + ' has state: ' + script.readyState.toString());
+                        delete moduleMap[script.src];
+                        loadEvent.currentTarget = script;
+                        requirejs.onScriptLoad(loadEvent);
+                        //force the define to be active
+                        requirejs([moduleName]);
+                    }
+                }
+            }, 0);
+        }
     }
     
     window.define.amd = {
-        multiversion: true,
-        plugins: true,
         jQuery: true
     };
 
-    window.require = function (deps, callback) {
-        setTimeout(function () {
-            // #1. Call the original require
-            oldRequire.call(window, deps, callback);
-            
-            defines.forEach(function (define, index) {
-                oldDefine.apply(window, define);
-
-                var scriptElements = document.getElementsByTagName("script");
-
-                for (var i = 0; i < scriptElements.length; i++) {
-                    var script = scriptElements[i];
-                    if (script.src == moduleUrls[index]) {
-                        loadEvent.currentTarget = script;
-                        requirejs.onScriptLoad(loadEvent);
-                    }
-                }
-            });            
-        }, 0);
-    }
-
     // Redirect all of the patched methods back to their originals
+    // so Intellisense will use the previously defined annotations
     intellisense.redirectDefinition(requirejs.load, oldLoad);
     intellisense.redirectDefinition(window.define, oldDefine);
     intellisense.redirectDefinition(window.require, oldRequire);
